@@ -1,0 +1,104 @@
+diff -ru source/CMakeLists.txt source-new/CMakeLists.txt
+--- source/CMakeLists.txt	2017-11-10 02:03:19.550611259 -0800
++++ source-new/CMakeLists.txt	2017-11-10 01:49:33.560320246 -0800
+@@ -10,6 +10,7 @@
+ include(CheckCCompilerFlag)
+ include(CheckCXXCompilerFlag)
+ include(GNUInstallDirs)
++include_directories(../sysroot/include)
+ 
+ set(ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
+ set(CMAKE_MACOSX_RPATH 1)
+--- source/src/openrct2/CMakeLists.txt	2017-11-10 02:03:19.637277747 -0800
++++ source-new/src/openrct2/CMakeLists.txt	2017-11-10 01:58:33.287673308 -0800
+@@ -222,7 +222,7 @@
+ 
+ # Compiler flags
+ set(DEBUG_LEVEL 0 CACHE STRING "Select debug level for compilation. Use value in range 0–3.")
+-set(COMMON_COMPILE_OPTIONS "${COMMON_COMPILE_OPTIONS} -fstrict-aliasing -Werror -Wundef -Wmissing-declarations -Winit-self -Wall -Wno-unknown-pragmas -Wno-unused-function -Wno-missing-braces ")
++set(COMMON_COMPILE_OPTIONS "${COMMON_COMPILE_OPTIONS} -fstrict-aliasing -Wno-error -Wundef -Wmissing-declarations -Winit-self -Wall -Wno-unknown-pragmas -Wno-unused-function -Wno-missing-braces ")
+ set(COMMON_COMPILE_OPTIONS "${COMMON_COMPILE_OPTIONS} -Wno-comment -Wshadow  -Wmissing-declarations -Wnonnull")
+ set(COMMON_COMPILE_OPTIONS "${COMMON_COMPILE_OPTIONS} -DDEBUG=${DEBUG_LEVEL}")
+ 
+diff -ru source/src/openrct2/common.h source-new/src/openrct2/common.h
+--- source/src/openrct2/common.h	2017-11-10 02:03:19.640611074 -0800
++++ source-new/src/openrct2/common.h	2017-11-10 01:54:41.177586020 -0800
+@@ -17,6 +17,8 @@
+ #ifndef _COMMON_H_
+ #define _COMMON_H_
+ 
++#define __linux__
++
+ #ifndef _USE_MATH_DEFINES
+ #define _USE_MATH_DEFINES
+ #endif
+diff -ru source/src/openrct2/core/FileStream.hpp source-new/src/openrct2/core/FileStream.hpp
+--- source/src/openrct2/core/FileStream.hpp	2017-11-10 02:03:19.643944400 -0800
++++ source-new/src/openrct2/core/FileStream.hpp	2017-11-10 01:52:53.034026598 -0800
+@@ -113,7 +113,7 @@
+     {
+ #if defined(_MSC_VER)
+         return _ftelli64(_file);
+-#elif (defined(__APPLE__) && defined(__MACH__)) || defined(__ANDROID__) || defined(__OpenBSD__) || defined(__FreeBSD__)
++#elif (defined(__APPLE__) && defined(__MACH__)) || defined(__ANDROID__) || defined(__OpenBSD__) || defined(__FreeBSD__) || defined (__redox__)
+         return ftello(_file);
+ #else
+         return ftello64(_file);
+@@ -139,7 +139,7 @@
+             _fseeki64(_file, offset, SEEK_END);
+             break;
+         }
+-#elif (defined(__APPLE__) && defined(__MACH__)) || defined(__ANDROID__) || defined(__OpenBSD__) || defined(__FreeBSD__)
++#elif (defined(__APPLE__) && defined(__MACH__)) || defined(__ANDROID__) || defined(__OpenBSD__) || defined(__FreeBSD__) || defined (__redox__)
+         switch (origin) {
+         case STREAM_SEEK_BEGIN:
+             fseeko(_file, offset, SEEK_SET);
+diff -ru source/src/openrct2/platform/linux.c source-new/src/openrct2/platform/linux.c
+--- source/src/openrct2/platform/linux.c	2017-11-10 02:03:19.663944359 -0800
++++ source-new/src/openrct2/platform/linux.c	2017-11-10 02:00:24.570904947 -0800
+@@ -27,7 +27,9 @@
+ #define OPENRCT2_MAX_COMMAND_LENGTH (2 * MAX_PATH)
+ 
+ #include <ctype.h>
++#ifndef __redox__
+ #include <dlfcn.h>
++#endif // __redox__
+ #include <errno.h>
+ #ifndef NO_TTF
+ #include <fontconfig/fontconfig.h>
+@@ -45,7 +47,9 @@
+ void platform_get_exe_path(utf8 *outPath, size_t outSize)
+ {
+     char exePath[MAX_PATH];
+-#ifdef __linux__
++#ifdef __redox__
++    strlcpy(exePath, "/bin/", sizeof(exePath));
++#elif defined( __linux__)
+     ssize_t bytesRead;
+     bytesRead = readlink("/proc/self/exe", exePath, MAX_PATH);
+     if (bytesRead == -1) {
+diff -ru source/src/openrct2/platform/posix.c source-new/src/openrct2/platform/posix.c
+--- source/src/openrct2/platform/posix.c	2017-11-10 02:03:19.663944359 -0800
++++ source-new/src/openrct2/platform/posix.c	2017-11-10 01:50:43.186877961 -0800
+@@ -22,7 +22,7 @@
+ #include <fcntl.h>
+ #include <fnmatch.h>
+ #ifndef __EMSCRIPTEN__
+-    #include <fts.h>
++//    #include <fts.h>
+ #endif
+ #include <libgen.h>
+ #include <locale.h>
+diff -ru source/src/openrct2/Version.h source-new/src/openrct2/Version.h
+--- source/src/openrct2/Version.h	2017-11-10 02:03:19.640611074 -0800
++++ source-new/src/openrct2/Version.h	2017-11-10 01:47:23.584456189 -0800
+@@ -70,6 +70,9 @@
+ #ifdef __EMSCRIPTEN__
+     #define OPENRCT2_PLATFORM       "Emscripten"
+ #endif
++#ifdef __redox__
++    #define OPENRCT2_PLATFORM       "Redox" 
++#endif
+ #ifndef OPENRCT2_PLATFORM
+     #error Unknown platform!
+ #endif
